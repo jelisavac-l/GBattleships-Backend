@@ -4,28 +4,28 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	"github.com/jelisavac-l/GBattleships/models"
+	"github.com/jelisavac-l/GBattleships/internal/model"
 )
 
 type Game struct {
-	ID			string
-	Player1		*models.Player
-	Player2		*models.Player
-	Board1		*models.Board
-	Board2		*models.Board
-	Turn		string
-	State 		string
+	ID      string
+	Player1 *model.Player
+	Player2 *model.Player
+	Board1  *model.Board
+	Board2  *model.Board
+	Turn    string
+	State   string
 }
 
-func CreateGame(player *models.Player) *Game {
+func CreateGame() *Game {
 	return &Game{
-		ID: uuid.New().String(),
-		Player1: player,
+		ID:    uuid.New().String(),
 		State: "waiting",
 	}
 }
 
-func (game *Game) JoinGame(player *models.Player) error {
+// to be removed maybe
+func (game *Game) JoinGame(player *model.Player) error {
 	if game.Player2 != nil {
 		return errors.New(game.ID + " game is full!")
 	} else {
@@ -41,5 +41,3 @@ func (game *Game) StartGame() {
 	// Loop moves & check conditions
 
 }
-
-
