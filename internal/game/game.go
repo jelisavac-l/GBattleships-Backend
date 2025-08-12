@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/jelisavac-l/GBattleships/internal/model"
@@ -25,19 +26,46 @@ func CreateGame() *Game {
 }
 
 func (game *Game) StartGame() {
-	// go getboard(player1)
-	// go getboard(player2)
-	// go tellGameStarted()	carries info whos turn is 1st
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go game.getBoard(game.Player1, &wg)
+	go game.getBoard(game.Player2, &wg)
+	wg.Wait()
 
-	// 		loop
-	// yourmove
-	// checkvalidmove
-	// playmove
-	// check state
-	// turn = !turn
+	tellGameStarted()
+	var hit bool
+	var err error
+	for game.State != "finished" {
+		x, y := getMove(hit)
+		if game.checkValidMove(x, y, !game.Turn) {
+			hit, err = game.PlayMove(x, y)
+			if err != nil {
+				// handle it ??
+			}
+			// tell hit or miss
+		} else {
+			// tell invalid move
+			continue
+		}
+		game.State = game.checkState()
+		game.Turn = !game.Turn
+	}
+
+	// tell game finished
+	// wait for response for rematch (probably wait 120 seconds before automatic no rematch)
 }
 
-func (game *Game) CheckValidBoard(board model.Board) bool {
+func (game *Game) checkState() string {
+	// check if finished
+	panic("unimplemented")
+}
+
+func getMove(hit bool) (int, int) {
+	// tells result of opps move and asks for next move
+	panic("unimplemented")
+}
+
+func (game *Game) checkValidBoard(board model.Board) bool {
 	dim := len(board.Cells)
 	if dim == 0 {
 		return false
@@ -100,7 +128,7 @@ func (game *Game) CheckValidBoard(board model.Board) bool {
 	return true
 }
 
-func (game *Game) checkValidMove(x int, y int, boardNo bool) bool { //boardNo being 1 or 2
+func (game *Game) checkValidMove(x int, y int, boardNo bool) bool {
 	if x > game.Board1.Size || y > game.Board1.Size {
 		return false
 	}
@@ -136,4 +164,14 @@ func (game *Game) PlayMove(x int, y int) (bool, error) {
 		return false, fmt.Errorf("game.Turn somehow not 1 nor 2")
 	}
 	return ret, err
+}
+
+func (game *Game) getBoard(player1 *model.Player, wg *sync.WaitGroup) {
+	defer wg.Done()
+	panic("unimplemented")
+}
+
+func tellGameStarted() {
+	// tells both players game has started, and tells them which is 1st to play (prob not neeeded)
+	panic("unimplemented")
 }
