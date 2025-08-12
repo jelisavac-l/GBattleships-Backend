@@ -13,7 +13,7 @@ type Game struct {
 	Player2 *model.Player
 	Board1  *model.Board
 	Board2  *model.Board
-	Turn    int
+	Turn    bool // true for player1 	false for player2
 	State   string
 }
 
@@ -25,11 +25,16 @@ func CreateGame() *Game {
 }
 
 func (game *Game) StartGame() {
+	// go getboard(player1)
+	// go getboard(player2)
+	// go tellGameStarted()	carries info whos turn is 1st
 
-	// Request boards
-
-	// Loop moves & check conditions
-
+	// 		loop
+	// yourmove
+	// checkvalidmove
+	// playmove
+	// check state
+	// turn = !turn
 }
 
 func (game *Game) CheckValidBoard(board model.Board) bool {
@@ -95,18 +100,18 @@ func (game *Game) CheckValidBoard(board model.Board) bool {
 	return true
 }
 
-func (game *Game) checkValidMove(x int, y int, boardNo int) bool { //boardNo being 1 or 2
+func (game *Game) checkValidMove(x int, y int, boardNo bool) bool { //boardNo being 1 or 2
 	if x > game.Board1.Size || y > game.Board1.Size {
 		return false
 	}
 	switch boardNo {
-	case 1:
+	case true:
 		if game.Board1.Cells[x][y] == model.Hit || game.Board1.Cells[x][y] == model.Miss {
 			return false
 		} else {
 			return true
 		}
-	case 2:
+	case false:
 		if game.Board2.Cells[x][y] == model.Hit || game.Board2.Cells[x][y] == model.Miss {
 			return false
 		} else {
@@ -123,9 +128,9 @@ func (game *Game) PlayMove(x int, y int) (bool, error) {
 	}
 	var ret bool
 	var err error
-	if game.Turn == 1 {
+	if game.Turn { // player1 turn
 		ret, err = game.Board1.ShootCell(x, y)
-	} else if game.Turn == 2 {
+	} else if !game.Turn { // player2 turn
 		ret, err = game.Board2.ShootCell(x, y)
 	} else {
 		return false, fmt.Errorf("game.Turn somehow not 1 nor 2")
