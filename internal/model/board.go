@@ -6,6 +6,7 @@ const (
 	Empty CellState = iota
 	Ship
 	Hit
+	Miss
 )
 
 type Board struct {
@@ -13,9 +14,21 @@ type Board struct {
 	Cells [][]CellState
 }
 
-func NewBoard(cells [][]CellState) *Board {
+func NewBoard(dim int) *Board {
 	return &Board{
-		Size:  len(cells),
-		Cells: cells,
+		Cells: make([][]CellState, dim),
+		Size:  dim * dim,
 	}
+}
+
+func (board *Board) SetCells(cells [][]CellState) {
+	if len(cells) != board.Size {
+		// error stuff
+		return
+	}
+	board.Cells = cells
+}
+
+func (board *Board) ShootCell(x int, y int) {
+	// check cell if ship or empty, set to hit or miss, return hit or miss
 }

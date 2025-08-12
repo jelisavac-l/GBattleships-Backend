@@ -13,7 +13,7 @@ type Game struct {
 	Player2 *model.Player
 	Board1  *model.Board
 	Board2  *model.Board
-	Turn    string
+	Turn    string // what this for
 	State   string
 }
 
@@ -40,4 +40,18 @@ func (game *Game) StartGame() {
 
 	// Loop moves & check conditions
 
+}
+
+func (game *Game) CheckValidBoard(board model.Board) {
+	// checking if board is valid before setting game.Board
+}
+
+func (game *Game) checkValidMove(x int, y int, boardNo int) { //boardNo being 1 or 2
+	// checks if move is valid (if (x,y) cell is iota or ship)
+}
+
+func (game *Game) PlayMove(x int, y int) {
+	// checkvalidMove
+
+	// board.ShootCell()
 }
