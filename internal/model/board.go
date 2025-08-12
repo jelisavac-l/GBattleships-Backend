@@ -1,5 +1,7 @@
 package model
 
+import "fmt"
+
 type CellState int
 
 const (
@@ -17,18 +19,27 @@ type Board struct {
 func NewBoard(dim int) *Board {
 	return &Board{
 		Cells: make([][]CellState, dim),
-		Size:  dim * dim,
+		Size:  dim,
 	}
 }
 
-func (board *Board) SetCells(cells [][]CellState) {
+func (board *Board) SetCells(cells [][]CellState) error {
 	if len(cells) != board.Size {
-		// error stuff
-		return
+		return fmt.Errorf("size of input cells not matching board size")
 	}
 	board.Cells = cells
+	return nil
 }
 
-func (board *Board) ShootCell(x int, y int) {
-	// check cell if ship or empty, set to hit or miss, return hit or miss
+func (board *Board) ShootCell(x int, y int) (bool, error) {
+	// true if hit, false if miss
+	switch board.Cells[x][y] {
+	case Empty:
+		board.Cells[x][y] = Miss
+		return false, nil
+	case Ship:
+		board.Cells[x][y] = Hit
+		return true, nil
+	}
+	return false, fmt.Errorf("ShootCell: cell is not empty nor ship")
 }
