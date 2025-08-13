@@ -14,7 +14,7 @@ func Run(game *game.Game) {
 	game.Player2 = &model.Player{}
 	RegisterHandlerRoutes(*game)
 
-	// game.StartGame()
+	// rematch := game.StartGame()
 	// testing block by evil gpt
 	{
 		conn := game.Player1.Conn
