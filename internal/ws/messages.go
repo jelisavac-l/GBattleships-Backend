@@ -7,7 +7,7 @@ type WSMessage struct {
 	Payload interface{} `json:"payload"`
 }
 
-type gameStartedMessage struct {
+type GameStartedMessage struct {
 	ID1       string `json:"id1"`
 	Username1 string `json:"username1"`
 	ID2       string `json:"id2"`
@@ -15,31 +15,31 @@ type gameStartedMessage struct {
 	State     string `json:"state"`
 }
 
-type getBoardMessage struct {
+type GetBoardMessage struct {
 }
-type sendBoardMessage struct {
+type SendBoardMessage struct {
 	Cells [][]model.CellState `json:"cells"`
 }
 
-type getTurnMessage struct {
+type GetTurnMessage struct {
 	X int `json:"x"`
 	Y int `json:"y"`
 }
-type sendTurnMessage struct {
+type SendTurnMessage struct {
 	X int `json:"x"`
 	Y int `json:"y"`
 }
-type turnResultMessage struct {
+type TurnResultMessage struct {
 	Hit bool `json:"hit"`
 }
 
-type gameResultMessage struct {
+type GameResultMessage struct {
 	WinnerUname string `json:"winneruname"`
 }
-type rematchMessage struct {
+type RematchMessage struct {
 	WantsRematch bool `json:"wantsrematch"`
 }
 
-type errorMessage struct {
+type ErrorMessage struct {
 	Error string `json:"error"`
 }
