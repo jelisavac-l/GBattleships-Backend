@@ -22,10 +22,11 @@ type Game struct {
 	State   string
 }
 
-func CreateGame() *Game {
+func CreateGame(player model.Player) *Game {
 	return &Game{
-		ID:    uuid.New().String(),
-		State: "waiting",
+		ID:      uuid.New().String(),
+		State:   "waiting",
+		Player1: &player,
 	}
 }
 
@@ -59,8 +60,7 @@ func (game *Game) StartGame() bool {
 		game.Turn = !game.Turn
 	}
 
-	rematch := game.tellResultsAskRematch(winnerUsername)
-	return rematch
+	return game.tellResultsAskRematch(winnerUsername)
 }
 
 func (game *Game) checkState() string {

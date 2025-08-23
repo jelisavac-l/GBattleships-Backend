@@ -10,11 +10,16 @@ import (
 )
 
 func Run(game *game.Game) {
-	game.Player1 = &model.Player{}
+	// game.Player1 = &model.Player{}
 	game.Player2 = &model.Player{}
 	RegisterHandlerRoutes(*game)
 
-	// rematch := game.StartGame()
+	for {
+		rematch := game.StartGame()
+		if !rematch {
+			break
+		}
+	}
 	// testing block by evil gpt
 	{
 		conn := game.Player1.Conn

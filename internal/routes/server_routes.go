@@ -24,9 +24,10 @@ var availableGames = []*game.Game{}
 
 func RegisterServerRoutes() {
 	http.HandleFunc("/game", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			getAvailableGames(w, r)
-		} else if r.Method == http.MethodPost {
+		case http.MethodPost:
 			// Parse request data
 			var data newGameRequest
 			if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -36,7 +37,7 @@ func RegisterServerRoutes() {
 			// Read player data and call createGame
 			player := model.Player{ID: data.ID, Username: data.Username}
 			createGame(w, r, &player)
-		} else {
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
@@ -44,7 +45,7 @@ func RegisterServerRoutes() {
 
 // POST /game
 func createGame(w http.ResponseWriter, r *http.Request, player *model.Player) {
-	gamePtr := game.CreateGame()
+	gamePtr := game.CreateGame(*player)
 	availableGames = append(availableGames, gamePtr)
 
 	go gamehandler.Run(gamePtr)
