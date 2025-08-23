@@ -43,7 +43,7 @@ func RegisterHandlerRoutes(g *game.Game) {
 		g.Player1.ID = r.URL.Query().Get("id")
 		g.Player1.Username = r.URL.Query().Get("username")
 		g.Player1.Conn = conn
-		log.Println("Player1 connected")
+		log.Println("Game " + g.ID + " Player1 connected")
 	})
 
 	http.HandleFunc("/"+g.ID+"/player2", func(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +56,6 @@ func RegisterHandlerRoutes(g *game.Game) {
 		g.Player2.ID = r.URL.Query().Get("id")
 		g.Player2.Username = r.URL.Query().Get("username")
 		g.Player2.Conn = conn
-		log.Println("Player2 connected")
+		log.Println("Game " + g.ID + " Player2 connected")
 	})
 }

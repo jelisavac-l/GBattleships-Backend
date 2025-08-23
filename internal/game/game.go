@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jelisavac-l/GBattleships/internal/model"
 	"github.com/jelisavac-l/GBattleships/internal/ws"
 )
@@ -22,9 +22,9 @@ type Game struct {
 	State   string
 }
 
-func CreateGame(player model.Player) *Game {
+func CreateGame(player model.Player, id int) *Game {
 	return &Game{
-		ID:      uuid.New().String(),
+		ID:      strconv.Itoa(id),
 		State:   "waiting",
 		Player1: &player,
 	}

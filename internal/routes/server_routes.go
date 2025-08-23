@@ -21,6 +21,7 @@ type availableGamesResponse struct {
 }
 
 var availableGames = []*game.Game{}
+var gameIdCounter = 0
 
 func RegisterServerRoutes() {
 	http.HandleFunc("/game", func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +46,9 @@ func RegisterServerRoutes() {
 
 // POST /game
 func createGame(w http.ResponseWriter, r *http.Request, player *model.Player) {
-	gamePtr := game.CreateGame(*player)
+	gamePtr := game.CreateGame(*player, gameIdCounter)
+	gameIdCounter++
+
 	availableGames = append(availableGames, gamePtr)
 
 	go gamehandler.Run(gamePtr)
