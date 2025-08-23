@@ -39,6 +39,7 @@ func (game *Game) StartGame() bool {
 
 	game.State = "playing"
 	game.tellGameStarted()
+	fmt.Println("Game " + game.ID + " state changed to playing")
 
 	var hit bool
 	var err error
@@ -77,7 +78,7 @@ func (game *Game) checkState() string {
 
 }
 
-func (game *Game) checkValidBoard(board model.Board) bool {
+func checkValidBoard(board model.Board) bool {
 	dim := len(board.Cells)
 	if dim == 0 {
 		return false
@@ -198,7 +199,8 @@ func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 		return
 	}
 
-	if msg.Type == "SendBoardMessage" {
+	switch msg.Type {
+	case "SendBoardMessage":
 		var payload ws.SendBoardMessage
 
 		raw, _ := json.Marshal(msg.Payload)
@@ -206,17 +208,18 @@ func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 			log.Printf("invalid sendBoard from %s: %v", player.Username, err)
 			return
 		}
-
-		board := &model.Board{Cells: payload.Cells}
-
+		var board model.Board
+		if (checkValidBoard(model.Board{Cells: payload.Cells})) {
+			board = model.Board{Cells: payload.Cells}
+		}
 		if game.Player1.ID == player.ID {
-			game.Board1 = board
+			game.Board1 = &board
 		} else if game.Player2.ID == player.ID {
-			game.Board2 = board
+			game.Board2 = &board
 		}
 		log.Printf("Board received from %s", player.Username)
 
-	} else if msg.Type == "ErrorMessage" {
+	case "ErrorMessage":
 		var payload ws.ErrorMessage
 		raw, _ := json.Marshal(msg.Payload)
 		json.Unmarshal(raw, &payload)

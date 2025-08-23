@@ -1,66 +1,29 @@
 package gamehandler
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/jelisavac-l/GBattleships/internal/game"
 	"github.com/jelisavac-l/GBattleships/internal/model"
 )
 
+var wg sync.WaitGroup
+
 func Run(game *game.Game) {
-	// game.Player1 = &model.Player{}
 	game.Player2 = &model.Player{}
-	RegisterHandlerRoutes(*game)
 
-	for {
-		rematch := game.StartGame()
-		if !rematch {
-			break
-		}
-	}
-	// testing block by evil gpt
-	{
-		conn := game.Player1.Conn
-		go func() {
-			defer conn.Close()
-			for {
-				mt, msg, err := conn.ReadMessage()
-				if err != nil {
-					log.Println("Player1 read error:", err)
-					return
-				}
-				log.Printf("Player1 sent: %s", string(msg))
+	wg.Add(2)
+	RegisterHandlerRoutes(game)
+	wg.Wait()
 
-				// Echo back the message
-				err = conn.WriteMessage(mt, msg)
-				if err != nil {
-					log.Println("Player1 write error:", err)
-					return
-				}
-			}
-		}()
-		conn2 := game.Player2.Conn
-		go func() {
-			defer conn2.Close()
-			for {
-				mt, msg, err := conn2.ReadMessage()
-				if err != nil {
-					log.Println("Player1 read error:", err)
-					return
-				}
-				log.Printf("Player1 sent: %s", string(msg))
-
-				// Echo back the message
-				err = conn2.WriteMessage(mt, msg)
-				if err != nil {
-					log.Println("Player1 write error:", err)
-					return
-				}
-			}
-		}()
-	}
+	fmt.Println("Game starting...")
+	rematch := game.StartGame()
+	fmt.Println(rematch)
+	// fmt.Println("EXITED FOR LOOP ?!?!?!?")
 
 }
 
@@ -69,8 +32,9 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func RegisterHandlerRoutes(g game.Game) {
+func RegisterHandlerRoutes(g *game.Game) {
 	http.HandleFunc("/"+g.ID+"/player1", func(w http.ResponseWriter, r *http.Request) {
+		defer wg.Done()
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("Failed to upgrade Player1:", err)
@@ -83,6 +47,7 @@ func RegisterHandlerRoutes(g game.Game) {
 	})
 
 	http.HandleFunc("/"+g.ID+"/player2", func(w http.ResponseWriter, r *http.Request) {
+		defer wg.Done()
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("Failed to upgrade Player2:", err)
@@ -93,9 +58,4 @@ func RegisterHandlerRoutes(g game.Game) {
 		g.Player2.Conn = conn
 		log.Println("Player2 connected")
 	})
-
-	log.Println("Starting server on: 8081")
-	if err := http.ListenAndServe(":8081", nil); err != nil {
-		log.Fatal("ListenAndServe error:", err)
-	}
 }
