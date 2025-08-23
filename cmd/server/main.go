@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Battleships server starting...")
+	fmt.Println("Battleships server started!")
 	routes.RegisterServerRoutes()
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {

@@ -20,6 +20,7 @@ type Game struct {
 	Board2  *model.Board
 	Turn    bool // true for player1 	false for player2
 	State   string
+	Wg      sync.WaitGroup
 }
 
 func CreateGame(player model.Player, id int) *Game {

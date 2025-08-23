@@ -4,23 +4,20 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/jelisavac-l/GBattleships/internal/game"
 	"github.com/jelisavac-l/GBattleships/internal/model"
 )
 
-var wg sync.WaitGroup
-
 func Run(game *game.Game) {
 	game.Player2 = &model.Player{}
 
-	wg.Add(2)
+	game.Wg.Add(2)
 	RegisterHandlerRoutes(game)
-	wg.Wait()
+	game.Wg.Wait()
 
-	fmt.Println("Game starting...")
+	log.Println("Game " + game.ID + " starting...")
 	rematch := game.StartGame()
 	fmt.Println(rematch)
 	// fmt.Println("EXITED FOR LOOP ?!?!?!?")
@@ -34,7 +31,7 @@ var upgrader = websocket.Upgrader{
 
 func RegisterHandlerRoutes(g *game.Game) {
 	http.HandleFunc("/"+g.ID+"/player1", func(w http.ResponseWriter, r *http.Request) {
-		defer wg.Done()
+		defer g.Wg.Done()
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("Failed to upgrade Player1:", err)
@@ -47,7 +44,7 @@ func RegisterHandlerRoutes(g *game.Game) {
 	})
 
 	http.HandleFunc("/"+g.ID+"/player2", func(w http.ResponseWriter, r *http.Request) {
-		defer wg.Done()
+		defer g.Wg.Done()
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("Failed to upgrade Player2:", err)
