@@ -22,8 +22,9 @@ type SendBoardMessage struct {
 }
 
 type GetTurnMessage struct {
-	X int `json:"x"`
-	Y int `json:"y"`
+	X   int  `json:"x"`
+	Y   int  `json:"y"`
+	Hit bool `json:"hit"`
 }
 type SendTurnMessage struct {
 	X int `json:"x"`

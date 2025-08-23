@@ -1,11 +1,15 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jelisavac-l/GBattleships/internal/model"
+	"github.com/jelisavac-l/GBattleships/internal/ws"
 )
 
 type Game struct {
@@ -38,6 +42,7 @@ func (game *Game) StartGame() bool {
 	var hit bool
 	var err error
 	var previousX, previousY int
+	var winnerUsername string
 	for game.State != "finished" {
 		x, y := game.getMove(game.Turn, previousX, previousY)
 		if game.checkValidMove(x, y, !game.Turn) {
@@ -54,7 +59,7 @@ func (game *Game) StartGame() bool {
 		game.Turn = !game.Turn
 	}
 
-	rematch := game.tellResultsAskRematch()
+	rematch := game.tellResultsAskRematch(winnerUsername)
 	return rematch
 }
 
@@ -173,30 +178,186 @@ func (game *Game) PlayMove(x int, y int) (bool, error) {
 	return ret, err
 }
 
-func (game *Game) getBoard(player1 *model.Player, wg *sync.WaitGroup) {
+func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 	defer wg.Done()
-	// game.checkValidBoard()
-	panic("unimplemented")
+
+	// ask player for board
+	req := ws.WSMessage{
+		Type:    "GetBoardMessage",
+		Payload: ws.GetBoardMessage{},
+	}
+	if err := player.Conn.WriteJSON(req); err != nil {
+		log.Printf("failed to send GetBoardMessage to %s: %v", player.Username, err)
+		return
+	}
+
+	// wait for response
+	var msg ws.WSMessage
+	if err := player.Conn.ReadJSON(&msg); err != nil {
+		log.Printf("failed to read board from %s: %v", player.Username, err)
+		return
+	}
+
+	if msg.Type == "SendBoardMessage" {
+		var payload ws.SendBoardMessage
+
+		raw, _ := json.Marshal(msg.Payload)
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			log.Printf("invalid sendBoard from %s: %v", player.Username, err)
+			return
+		}
+
+		board := &model.Board{Cells: payload.Cells}
+
+		if game.Player1.ID == player.ID {
+			game.Board1 = board
+		} else if game.Player2.ID == player.ID {
+			game.Board2 = board
+		}
+		log.Printf("Board received from %s", player.Username)
+
+	} else if msg.Type == "ErrorMessage" {
+		var payload ws.ErrorMessage
+		raw, _ := json.Marshal(msg.Payload)
+		json.Unmarshal(raw, &payload)
+		log.Printf("error from %s: %s", player.Username, payload.Error)
+		return
+	}
 }
 
 func (game *Game) tellGameStarted() {
-	// tells both players game has started, and tells them which is 1st to play (prob not neeeded)
-	panic("unimplemented")
+	msg := ws.WSMessage{
+		Type: "gameStartedMessage",
+		Payload: ws.GameStartedMessage{
+			ID1:       game.Player1.ID,
+			Username1: game.Player1.Username,
+			ID2:       game.Player2.ID,
+			Username2: game.Player2.Username,
+			State:     game.State,
+		},
+	}
+
+	if err := game.Player1.Conn.WriteJSON(msg); err != nil {
+		log.Printf("failed to notify %s gameStarted: %v", game.Player1.Username, err)
+	}
+	if err := game.Player2.Conn.WriteJSON(msg); err != nil {
+		log.Printf("failed to notify %s gameStarted: %v", game.Player2.Username, err)
+	}
 }
 
 func (game *Game) getMove(hit bool, x int, y int) (int, int) {
-	// tells result of opps move and asks for next move
-	// depends on game.Turn
-	panic("unimplemented")
+	var current *model.Player
+	if game.Turn {
+		current = game.Player1
+	} else {
+		current = game.Player2
+	}
+
+	// tell current player it’s their turn, include result of opponent’s move
+	notify := ws.WSMessage{
+		Type: "GetTurnMessage",
+		Payload: ws.GetTurnMessage{
+			X:   x,
+			Y:   y,
+			Hit: hit,
+		},
+	}
+	if err := current.Conn.WriteJSON(notify); err != nil {
+		log.Printf("failed to notify %s about previous move: %v", current.Username, err)
+		return -1, -1
+	}
+
+	// wait for their reply ( move)
+	var msg ws.WSMessage
+	if err := current.Conn.ReadJSON(&msg); err != nil {
+		log.Printf("failed to read move from %s: %v", current.Username, err)
+		return -1, -1
+	}
+	if msg.Type != "SendTurnMessage" {
+		log.Printf("unexpected message type %s from %s", msg.Type, current.Username)
+		return -1, -1
+	}
+
+	var payload ws.SendTurnMessage
+	raw, _ := json.Marshal(msg.Payload)
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		log.Printf("invalid SendTurnMessage from %s: %v", current.Username, err)
+		return -1, -1
+	}
+
+	return payload.X, payload.Y
 }
 
 func (game *Game) sendHitOrMiss(hit bool) {
-	// sends hit to player1 or player 2 depending on game.Turn
-	panic("unimplemented")
+	var current *model.Player
+	if game.Turn {
+		current = game.Player1
+	} else {
+		current = game.Player2
+	}
+
+	msg := ws.WSMessage{
+		Type: "TurnResultMessage",
+		Payload: ws.TurnResultMessage{
+			Hit: hit,
+		},
+	}
+
+	if err := current.Conn.WriteJSON(msg); err != nil {
+		log.Printf("failed to send TurnResultMessage to %s: %v", current.Username, err)
+	}
 }
 
-func (game *Game) tellResultsAskRematch() bool {
-	// tell game finished
-	// wait for response for rematch (probably wait 120 seconds before automatic no rematch)
-	panic("unimplemented")
+func (game *Game) tellResultsAskRematch(winner string) bool {
+	// tell game result
+	resultMsg := ws.WSMessage{
+		Type: "GameResultMessage",
+		Payload: ws.GameResultMessage{
+			WinnerUname: winner,
+		},
+	}
+	_ = game.Player1.Conn.WriteJSON(resultMsg)
+	_ = game.Player2.Conn.WriteJSON(resultMsg)
+
+	// make channels to collect responses
+	respCh := make(chan bool, 2)
+
+	waitForResponse := func(p *model.Player) {
+		var msg ws.WSMessage
+		if err := p.Conn.ReadJSON(&msg); err != nil {
+			respCh <- false
+			return
+		}
+		if msg.Type != "RematchMessage" {
+			respCh <- false
+			return
+		}
+
+		var payload ws.RematchMessage
+		raw, _ := json.Marshal(msg.Payload)
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			respCh <- false
+			return
+		}
+		respCh <- payload.WantsRematch
+	}
+
+	go waitForResponse(game.Player1)
+	go waitForResponse(game.Player2)
+
+	timeout := time.After(60 * time.Second)
+	yesCount := 0
+
+	for i := 0; i < 2; i++ {
+		select {
+		case resp := <-respCh:
+			if resp {
+				yesCount++
+			}
+		case <-timeout:
+			return false
+		}
+	}
+
+	return yesCount == 2
 }
