@@ -13,14 +13,15 @@ import (
 )
 
 type Game struct {
-	ID      string
-	Player1 *model.Player
-	Player2 *model.Player
-	Board1  *model.Board
-	Board2  *model.Board
-	Turn    bool // true for player1 	false for player2
-	State   string
-	Wg      sync.WaitGroup
+	ID             string
+	Player1        *model.Player
+	Player2        *model.Player
+	Board1         *model.Board
+	Board2         *model.Board
+	Turn           bool // true for player1 	false for player2
+	State          string
+	winnerUsername string
+	Wg             sync.WaitGroup
 }
 
 func CreateGame(player model.Player, id int) *Game {
@@ -40,12 +41,11 @@ func (game *Game) StartGame() bool {
 
 	game.State = "playing"
 	game.tellGameStarted()
-	fmt.Println("Game " + game.ID + " state changed to playing")
+	log.Println("Game " + game.ID + " state changed to playing")
 
 	var hit bool
 	var err error
 	var previousX, previousY int
-	var winnerUsername string
 	for game.State != "finished" {
 		x, y := game.getMove(game.Turn, previousX, previousY)
 		if game.checkValidMove(x, y, !game.Turn) {
@@ -56,22 +56,27 @@ func (game *Game) StartGame() bool {
 			game.sendHitOrMiss(hit)
 		} else {
 			// tell invalid move
+			fmt.Println("continue loop")
 			continue
 		}
 		game.State = game.checkState()
+		previousX = x
+		previousY = y
 		game.Turn = !game.Turn
 	}
 
-	return game.tellResultsAskRematch(winnerUsername)
+	return game.tellResultsAskRematch()
 }
 
 func (game *Game) checkState() string {
 	if game.Turn { // player1 turn
 		if game.Board2.Hits == 17 {
+			game.winnerUsername = game.Player1.Username
 			return "finished"
 		}
 	} else if !game.Turn { // player2 turn
 		if game.Board1.Hits == 17 {
+			game.winnerUsername = game.Player2.Username
 			return "finished"
 		}
 	}
@@ -144,17 +149,20 @@ func checkValidBoard(board model.Board) bool {
 
 func (game *Game) checkValidMove(x int, y int, boardNo bool) bool {
 	if x > game.Board1.Size || y > game.Board1.Size {
+		fmt.Println("returned on size check")
 		return false
 	}
 	switch boardNo {
 	case true:
 		if game.Board1.Cells[x][y] == model.Hit || game.Board1.Cells[x][y] == model.Miss {
+			fmt.Println("returned on board1 check")
 			return false
 		} else {
 			return true
 		}
 	case false:
 		if game.Board2.Cells[x][y] == model.Hit || game.Board2.Cells[x][y] == model.Miss {
+			fmt.Println("returned on board2 check")
 			return false
 		} else {
 			return true
@@ -165,15 +173,16 @@ func (game *Game) checkValidMove(x int, y int, boardNo bool) bool {
 }
 
 func (game *Game) PlayMove(x int, y int) (bool, error) {
-	if !game.checkValidMove(x, y, game.Turn) {
-		return false, fmt.Errorf("move invalid")
-	}
 	var ret bool
 	var err error
 	if game.Turn { // player1 turn
-		ret, err = game.Board1.ShootCell(x, y)
-	} else if !game.Turn { // player2 turn
 		ret, err = game.Board2.ShootCell(x, y)
+		fmt.Println("Board2:", game.Board2.Cells)
+		fmt.Println()
+	} else if !game.Turn { // player2 turn
+		ret, err = game.Board1.ShootCell(x, y)
+		fmt.Println("Board1:", game.Board1.Cells)
+		fmt.Println()
 	} else {
 		return false, fmt.Errorf("game.Turn somehow not 1 nor 2")
 	}
@@ -209,9 +218,10 @@ func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 			log.Printf("invalid sendBoard from %s: %v", player.Username, err)
 			return
 		}
-		var board model.Board
+		var board = model.NewBoard(10)
+		fmt.Println("Board is valid ", checkValidBoard(model.Board{Cells: payload.Cells}))
 		if (checkValidBoard(model.Board{Cells: payload.Cells})) {
-			board = model.Board{Cells: payload.Cells}
+			board.Cells = payload.Cells
 		}
 		if game.Player1.ID == player.ID {
 			game.Board1 = &board
@@ -312,12 +322,12 @@ func (game *Game) sendHitOrMiss(hit bool) {
 	}
 }
 
-func (game *Game) tellResultsAskRematch(winner string) bool {
+func (game *Game) tellResultsAskRematch() bool {
 	// tell game result
 	resultMsg := ws.WSMessage{
 		Type: "GameResultMessage",
 		Payload: ws.GameResultMessage{
-			WinnerUname: winner,
+			WinnerUname: game.winnerUsername,
 		},
 	}
 	_ = game.Player1.Conn.WriteJSON(resultMsg)

@@ -17,8 +17,8 @@ type Board struct {
 	Hits  int
 }
 
-func NewBoard(dim int) *Board {
-	return &Board{
+func NewBoard(dim int) Board {
+	return Board{
 		Cells: make([][]CellState, dim),
 		Size:  dim,
 		Hits:  0,
