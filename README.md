@@ -1,7 +1,7 @@
 <h1 align="center">⚓ GBattleships-Backend ⚓</h1>
 <div align="center">
   <img src="https://img.shields.io/badge/Luka_Jelisavac-2022--0554-navy" alt="Luka Jelisavac Badge" />
-  <img src="https://img.shields.io/badge/Vuk_Janjušević-2022--0xxx-firebrick" alt="Vuk Janjušević Badge" />
+  <img src="https://img.shields.io/badge/Vuk_Janjušević-2022--0225-firebrick" alt="Vuk Janjušević Badge" />
 </div>
 <br>
 <div align="center">
