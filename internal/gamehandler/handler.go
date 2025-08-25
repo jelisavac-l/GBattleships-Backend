@@ -27,6 +27,11 @@ func Run(game *game.Game) {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+
+	// Tell the upgrader to allow all incoming origins (including localhost)
+	CheckOrigin: func(r *http.Request) bool {
+        return true
+    },
 }
 
 func RegisterHandlerRoutes(g *game.Game) {
