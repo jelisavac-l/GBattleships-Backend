@@ -2,7 +2,6 @@ package game
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"strconv"
 	"sync"
@@ -51,12 +50,24 @@ func (game *Game) StartGame() bool {
 		if game.checkValidMove(x, y, !game.Turn) {
 			hit, err = game.PlayMove(x, y)
 			if err != nil {
-				// handle it ??
+				var player model.Player
+				if game.Turn {
+					player = *game.Player1
+				} else {
+					player = *game.Player2
+				}
+				sendErrorMessage(err.Error(), &player)
+				continue
 			}
 			game.sendHitOrMiss(hit)
 		} else {
-			// tell invalid move
-			fmt.Println("continue loop")
+			var player model.Player
+			if game.Turn {
+				player = *game.Player1
+			} else {
+				player = *game.Player2
+			}
+			sendErrorMessage("x or y out of bounds", &player)
 			continue
 		}
 		game.State = game.checkState()
@@ -149,27 +160,9 @@ func checkValidBoard(board model.Board) bool {
 
 func (game *Game) checkValidMove(x int, y int, boardNo bool) bool {
 	if x > game.Board1.Size || y > game.Board1.Size {
-		fmt.Println("returned on size check")
 		return false
 	}
-	switch boardNo {
-	case true:
-		if game.Board1.Cells[x][y] == model.Hit || game.Board1.Cells[x][y] == model.Miss {
-			fmt.Println("returned on board1 check")
-			return false
-		} else {
-			return true
-		}
-	case false:
-		if game.Board2.Cells[x][y] == model.Hit || game.Board2.Cells[x][y] == model.Miss {
-			fmt.Println("returned on board2 check")
-			return false
-		} else {
-			return true
-		}
-	default:
-		return false
-	}
+	return true
 }
 
 func (game *Game) PlayMove(x int, y int) (bool, error) {
@@ -177,65 +170,79 @@ func (game *Game) PlayMove(x int, y int) (bool, error) {
 	var err error
 	if game.Turn { // player1 turn
 		ret, err = game.Board2.ShootCell(x, y)
-		fmt.Println("Board2:", game.Board2.Cells)
-		fmt.Println()
-	} else if !game.Turn { // player2 turn
+	} else { // player2 turn
 		ret, err = game.Board1.ShootCell(x, y)
-		fmt.Println("Board1:", game.Board1.Cells)
-		fmt.Println()
-	} else {
-		return false, fmt.Errorf("game.Turn somehow not 1 nor 2")
 	}
 	return ret, err
 }
 
 func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 	defer wg.Done()
-
-	// ask player for board
-	req := ws.WSMessage{
-		Type:    "GetBoardMessage",
-		Payload: ws.GetBoardMessage{},
-	}
-	if err := player.Conn.WriteJSON(req); err != nil {
-		log.Printf("failed to send GetBoardMessage to %s: %v", player.Username, err)
-		return
-	}
-
-	// wait for response
-	var msg ws.WSMessage
-	if err := player.Conn.ReadJSON(&msg); err != nil {
-		log.Printf("failed to read board from %s: %v", player.Username, err)
-		return
-	}
-
-	switch msg.Type {
-	case "SendBoardMessage":
-		var payload ws.SendBoardMessage
-
-		raw, _ := json.Marshal(msg.Payload)
-		if err := json.Unmarshal(raw, &payload); err != nil {
-			log.Printf("invalid sendBoard from %s: %v", player.Username, err)
-			return
+	falseIfCompleted := true
+	for falseIfCompleted {
+		// ask player for board
+		req := ws.WSMessage{
+			Type:    "GetBoardMessage",
+			Payload: ws.GetBoardMessage{},
 		}
-		var board = model.NewBoard(10)
-		fmt.Println("Board is valid ", checkValidBoard(model.Board{Cells: payload.Cells}))
-		if (checkValidBoard(model.Board{Cells: payload.Cells})) {
-			board.Cells = payload.Cells
+		if err := player.Conn.WriteJSON(req); err != nil {
+			log.Printf("failed to send GetBoardMessage to %s: %v", player.Username, err)
+			continue
 		}
-		if game.Player1.ID == player.ID {
-			game.Board1 = &board
-		} else if game.Player2.ID == player.ID {
-			game.Board2 = &board
-		}
-		log.Printf("Board received from %s", player.Username)
 
-	case "ErrorMessage":
-		var payload ws.ErrorMessage
-		raw, _ := json.Marshal(msg.Payload)
-		json.Unmarshal(raw, &payload)
-		log.Printf("error from %s: %s", player.Username, payload.Error)
-		return
+		// wait for response
+		var msg ws.WSMessage
+		if err := player.Conn.ReadJSON(&msg); err != nil {
+			log.Printf("failed to read board from %s: %v", player.Username, err)
+			sendErrorMessage("Failed to read board", player)
+			continue
+		}
+		switch msg.Type {
+		case "SendBoardMessage":
+			var payload ws.SendBoardMessage
+
+			raw, _ := json.Marshal(msg.Payload)
+			if err := json.Unmarshal(raw, &payload); err != nil {
+				log.Printf("invalid sendBoard from %s: %v", player.Username, err)
+				sendErrorMessage("invalid SendBoardMessage", player)
+				continue
+			}
+			var board = model.NewBoard(10)
+			if (checkValidBoard(model.Board{Cells: payload.Cells})) {
+				board.Cells = payload.Cells
+				if game.Player1.ID == player.ID {
+					game.Board1 = &board
+				} else if game.Player2.ID == player.ID {
+					game.Board2 = &board
+				}
+				log.Printf("Board received from %s", player.Username)
+				falseIfCompleted = false
+			} else {
+				log.Printf("invalid sendBoard from %s", player.Username)
+				sendErrorMessage("Invalid board", player)
+				continue
+			}
+
+		case "ErrorMessage":
+			var payload ws.ErrorMessage
+			raw, _ := json.Marshal(msg.Payload)
+			json.Unmarshal(raw, &payload)
+			log.Printf("error from %s: %s", player.Username, payload.Error)
+			continue
+		}
+	}
+}
+
+func sendErrorMessage(s string, player *model.Player) {
+	errmsg := ws.WSMessage{
+		Type: "ErrorMessage",
+		Payload: ws.ErrorMessage{
+			Error: s,
+		},
+	}
+
+	if err := player.Conn.WriteJSON(errmsg); err != nil {
+		log.Printf("failed to notify %s about error: %v", player.Username, err)
 	}
 }
 

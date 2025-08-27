@@ -44,5 +44,5 @@ func (board *Board) ShootCell(x int, y int) (bool, error) {
 		board.Hits++
 		return true, nil
 	}
-	return false, fmt.Errorf("ShootCell: cell is not empty nor ship")
+	return false, fmt.Errorf("cell was already played")
 }

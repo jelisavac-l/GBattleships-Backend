@@ -1,7 +1,6 @@
 package gamehandler
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -17,11 +16,13 @@ func Run(game *game.Game) {
 	RegisterHandlerRoutes(game)
 	game.Wg.Wait()
 
-	log.Println("Game " + game.ID + " starting...")
-	rematch := game.StartGame()
-	fmt.Println(rematch)
-	// fmt.Println("EXITED FOR LOOP ?!?!?!?")
+	rematch := true
+	for rematch {
+		log.Println("Game handler " + game.ID + " started...")
+		rematch = game.StartGame()
+	}
 
+	log.Println("Game handler" + game.ID + " stopped.")
 }
 
 var upgrader = websocket.Upgrader{
@@ -30,8 +31,8 @@ var upgrader = websocket.Upgrader{
 
 	// Tell the upgrader to allow all incoming origins (including localhost)
 	CheckOrigin: func(r *http.Request) bool {
-        return true
-    },
+		return true
+	},
 }
 
 func RegisterHandlerRoutes(g *game.Game) {
