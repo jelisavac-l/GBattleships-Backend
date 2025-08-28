@@ -10,7 +10,6 @@ import (
 )
 
 func Run(game *game.Game) {
-	game.Player2 = &model.Player{}
 
 	game.Wg.Add(2)
 	RegisterHandlerRoutes(game)
@@ -37,28 +36,47 @@ var upgrader = websocket.Upgrader{
 
 func RegisterHandlerRoutes(g *game.Game) {
 	http.HandleFunc("/"+g.ID+"/player1", func(w http.ResponseWriter, r *http.Request) {
-		defer g.Wg.Done()
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println("Failed to upgrade Player1:", err)
-			return
-		}
-		g.Player1.ID = r.URL.Query().Get("id")
-		g.Player1.Username = r.URL.Query().Get("username")
-		g.Player1.Conn = conn
-		log.Println("Game " + g.ID + " Player1 connected")
+		handlePlayerConnection(&g.Player1, g, w, r)
 	})
 
 	http.HandleFunc("/"+g.ID+"/player2", func(w http.ResponseWriter, r *http.Request) {
-		defer g.Wg.Done()
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println("Failed to upgrade Player2:", err)
-			return
-		}
-		g.Player2.ID = r.URL.Query().Get("id")
-		g.Player2.Username = r.URL.Query().Get("username")
-		g.Player2.Conn = conn
-		log.Println("Game " + g.ID + " Player2 connected")
+		handlePlayerConnection(&g.Player2, g, w, r)
 	})
+}
+
+func handlePlayerConnection(player **model.Player, g *game.Game, w http.ResponseWriter, r *http.Request) {
+	// seat taken type beat
+	if *player != nil && (*player).Conn != nil {
+		http.Error(w, "Player already connected", http.StatusConflict)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("Failed to upgrade:", err)
+		return
+	}
+
+	if *player == nil {
+		*player = &model.Player{}
+	}
+
+	(*player).ID = r.URL.Query().Get("id")
+	(*player).Username = r.URL.Query().Get("username")
+	(*player).Conn = conn
+	log.Printf("Player %s connected", (*player).Username)
+
+	// looking for disconnect
+	go func(p **model.Player) {
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				log.Printf("Player %s disconnected: %v", (*p).Username, err)
+				conn.Close()
+				(*p).Conn = nil
+				return
+			}
+		}
+	}(player)
+
+	g.Wg.Done()
 }
