@@ -45,11 +45,12 @@ func (game *Game) StartGame() bool {
 	game.tellGameStarted()
 	log.Println("Game " + game.ID + " state changed to playing")
 
-	var hit bool
+	hit := false
 	var err error
-	var previousX, previousY int
+	previousX := -1
+	previousY := -1
 	for game.State != "finished" && game.State != "broken" {
-		x, y := game.getMove(game.Turn, previousX, previousY)
+		x, y := game.getMove(hit, previousX, previousY)
 		if game.checkValidMove(x, y) {
 			hit, err = game.PlayMove(x, y)
 			if err != nil {
