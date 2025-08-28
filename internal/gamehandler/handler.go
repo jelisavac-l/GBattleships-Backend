@@ -66,17 +66,5 @@ func handlePlayerConnection(player **model.Player, g *game.Game, w http.Response
 	(*player).Conn = conn
 	log.Printf("Player %s connected", (*player).Username)
 
-	// looking for disconnect
-	go func(p **model.Player) {
-		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
-				log.Printf("Player %s disconnected: %v", (*p).Username, err)
-				conn.Close()
-				(*p).Conn = nil
-				return
-			}
-		}
-	}(player)
-
 	g.Wg.Done()
 }

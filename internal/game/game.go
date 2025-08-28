@@ -47,7 +47,7 @@ func (game *Game) StartGame() bool {
 	var previousX, previousY int
 	for game.State != "finished" {
 		x, y := game.getMove(game.Turn, previousX, previousY)
-		if game.checkValidMove(x, y, !game.Turn) {
+		if game.checkValidMove(x, y) {
 			hit, err = game.PlayMove(x, y)
 			if err != nil {
 				var player model.Player
@@ -158,8 +158,8 @@ func checkValidBoard(board model.Board) bool {
 	return true
 }
 
-func (game *Game) checkValidMove(x int, y int, boardNo bool) bool {
-	if x > game.Board1.Size || y > game.Board1.Size {
+func (game *Game) checkValidMove(x int, y int) bool {
+	if x >= game.Board1.Size || y >= game.Board1.Size || x < 0 || y < 0 {
 		return false
 	}
 	return true
