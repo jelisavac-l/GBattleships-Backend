@@ -18,10 +18,32 @@ func Run(game *game.Game) {
 	rematch := true
 	for rematch {
 		log.Println("Game handler " + game.ID + " started...")
-		rematch = game.StartGame()
+		rematch = safeStartGame(game)
 	}
 
 	log.Println("Game handler" + game.ID + " stopped.")
+	game.Player1.Conn.Close()
+	game.Player2.Conn.Close()
+}
+
+func safeStartGame(g *game.Game) (rematch bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Game %s crashed: %v", g.ID, r)
+			if g.Player1 != nil && g.Player1.Conn != nil {
+				game.SendErrorMessage("Game stopped due to error", g.Player1)
+
+			}
+			if g.Player2 != nil && g.Player2.Conn != nil {
+				game.SendErrorMessage("Game stopped due to error", g.Player2)
+			}
+			rematch = false
+			g.State = "finished"
+		}
+	}()
+	rematch = g.StartGame()
+	return rematch
+
 }
 
 var upgrader = websocket.Upgrader{

@@ -37,6 +37,9 @@ func (game *Game) StartGame() bool {
 	go game.getBoard(game.Player1, &wg)
 	go game.getBoard(game.Player2, &wg)
 	wg.Wait()
+	if game.State == "broken" {
+		return false
+	}
 
 	game.State = "playing"
 	game.tellGameStarted()
@@ -45,7 +48,7 @@ func (game *Game) StartGame() bool {
 	var hit bool
 	var err error
 	var previousX, previousY int
-	for game.State != "finished" {
+	for game.State != "finished" && game.State != "broken" {
 		x, y := game.getMove(game.Turn, previousX, previousY)
 		if game.checkValidMove(x, y) {
 			hit, err = game.PlayMove(x, y)
@@ -56,7 +59,7 @@ func (game *Game) StartGame() bool {
 				} else {
 					player = *game.Player2
 				}
-				sendErrorMessage(err.Error(), &player)
+				SendErrorMessage(err.Error(), &player)
 				continue
 			}
 			game.sendHitOrMiss(hit)
@@ -67,7 +70,7 @@ func (game *Game) StartGame() bool {
 			} else {
 				player = *game.Player2
 			}
-			sendErrorMessage("x or y out of bounds", &player)
+			SendErrorMessage("x or y out of bounds", &player)
 			continue
 		}
 		game.State = game.checkState()
@@ -75,7 +78,9 @@ func (game *Game) StartGame() bool {
 		previousY = y
 		game.Turn = !game.Turn
 	}
-
+	if game.State == "broken" {
+		return false
+	}
 	return game.tellResultsAskRematch()
 }
 
@@ -91,7 +96,7 @@ func (game *Game) checkState() string {
 			return "finished"
 		}
 	}
-	return "playing"
+	return game.State
 
 }
 
@@ -187,15 +192,17 @@ func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 		}
 		if err := player.Conn.WriteJSON(req); err != nil {
 			log.Printf("failed to send GetBoardMessage to %s: %v", player.Username, err)
-			continue
+			game.handlePlayerDisconnect(player)
+			break
 		}
 
 		// wait for response
 		var msg ws.WSMessage
 		if err := player.Conn.ReadJSON(&msg); err != nil {
 			log.Printf("failed to read board from %s: %v", player.Username, err)
-			sendErrorMessage("Failed to read board", player)
-			continue
+			game.handlePlayerDisconnect(player)
+			falseIfCompleted = false
+			break
 		}
 		switch msg.Type {
 		case "SendBoardMessage":
@@ -204,7 +211,7 @@ func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 			raw, _ := json.Marshal(msg.Payload)
 			if err := json.Unmarshal(raw, &payload); err != nil {
 				log.Printf("invalid sendBoard from %s: %v", player.Username, err)
-				sendErrorMessage("invalid SendBoardMessage", player)
+				SendErrorMessage("invalid SendBoardMessage", player)
 				continue
 			}
 			var board = model.NewBoard(10)
@@ -219,7 +226,7 @@ func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 				falseIfCompleted = false
 			} else {
 				log.Printf("invalid sendBoard from %s", player.Username)
-				sendErrorMessage("Invalid board", player)
+				SendErrorMessage("Invalid board", player)
 				continue
 			}
 
@@ -233,7 +240,7 @@ func (game *Game) getBoard(player *model.Player, wg *sync.WaitGroup) {
 	}
 }
 
-func sendErrorMessage(s string, player *model.Player) {
+func SendErrorMessage(s string, player *model.Player) {
 	errmsg := ws.WSMessage{
 		Type: "ErrorMessage",
 		Payload: ws.ErrorMessage{
@@ -274,7 +281,6 @@ func (game *Game) getMove(hit bool, x int, y int) (int, int) {
 		current = game.Player2
 	}
 
-	// tell current player it’s their turn, include result of opponent’s move
 	notify := ws.WSMessage{
 		Type: "GetTurnMessage",
 		Payload: ws.GetTurnMessage{
@@ -284,18 +290,21 @@ func (game *Game) getMove(hit bool, x int, y int) (int, int) {
 		},
 	}
 	if err := current.Conn.WriteJSON(notify); err != nil {
-		log.Printf("failed to notify %s about previous move: %v", current.Username, err)
+		log.Printf("failed to notify %s: %v", current.Username, err)
+		game.handlePlayerDisconnect(current)
 		return -1, -1
 	}
 
-	// wait for their reply ( move)
 	var msg ws.WSMessage
 	if err := current.Conn.ReadJSON(&msg); err != nil {
 		log.Printf("failed to read move from %s: %v", current.Username, err)
+		game.handlePlayerDisconnect(current)
 		return -1, -1
 	}
+
 	if msg.Type != "SendTurnMessage" {
 		log.Printf("unexpected message type %s from %s", msg.Type, current.Username)
+		// game.handlePlayerDisconnect(current)
 		return -1, -1
 	}
 
@@ -303,6 +312,7 @@ func (game *Game) getMove(hit bool, x int, y int) (int, int) {
 	raw, _ := json.Marshal(msg.Payload)
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		log.Printf("invalid SendTurnMessage from %s: %v", current.Username, err)
+		// game.handlePlayerDisconnect(current)
 		return -1, -1
 	}
 
@@ -381,4 +391,22 @@ func (game *Game) tellResultsAskRematch() bool {
 	}
 
 	return yesCount == 2
+}
+
+func (game *Game) handlePlayerDisconnect(disconnected *model.Player) {
+	var other *model.Player
+	if disconnected == game.Player1 {
+		other = game.Player2
+	} else {
+		other = game.Player1
+	}
+
+	if other != nil && other.Conn != nil {
+		SendErrorMessage("Opponent disconnected. Game ended.", other)
+		// other.Conn.Close()
+	}
+
+	game.State = "broken"
+	log.Printf("Player %s disconnected.", disconnected.Username)
+
 }
