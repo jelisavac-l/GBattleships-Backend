@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/jelisavac-l/GBattleships/internal/routes"
 )
@@ -28,7 +29,12 @@ func main() {
 	fmt.Println("Battleships server started!")
 	routes.RegisterServerRoutes()
 
-	if err := http.ListenAndServe(":8080", corsMiddleware(http.DefaultServeMux)); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // default for local testing
+	}
+
+	if err := http.ListenAndServe(":"+port, corsMiddleware(http.DefaultServeMux)); err != nil {
 		log.Fatal(err)
 	}
 
